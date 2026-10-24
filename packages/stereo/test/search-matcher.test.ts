@@ -1,4 +1,5 @@
-import { expect, test } from "vitest";
+import { ChildProcess } from "node:child_process";
+import { expect, test, vi } from "vitest";
 import { matchSearchLines } from "../src/search-matcher.js";
 
 const ranges = (start: number, end: number) => [{ start, end }];
@@ -37,6 +38,24 @@ test("invalid and incomplete expressions report errors rather than matching anot
   await expect(Promise.resolve().then(() => matchSearchLines(["ready"], "ready AND"))).rejects.toThrow("expected a term");
   await expect(Promise.resolve().then(() => matchSearchLines(["ready"], "regex:["))).rejects.toThrow();
   await expect(Promise.resolve().then(() => matchSearchLines(["ready"], "regex:"))).rejects.toThrow("Enter a regex");
+});
+
+test("cancelling a missing regex executable never signals an unspawned process", async () => {
+  const originalPath = process.env.PATH;
+  const kill = vi.spyOn(ChildProcess.prototype, "kill").mockReturnValue(false);
+  try {
+    process.env.PATH = "";
+    await expect(matchSearchLines(["ready"], "regex:ready")).rejects.toMatchObject({ code: "ENOENT" });
+    const controller = new AbortController();
+    const job = matchSearchLines(["ready"], "regex:ready", controller.signal);
+    controller.abort();
+    await expect(job).rejects.toMatchObject({ name: "AbortError" });
+    expect(kill).not.toHaveBeenCalled();
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    kill.mockRestore();
+  }
 });
 
 test("regex can be cancelled or timed out without blocking the UI thread", async () => {

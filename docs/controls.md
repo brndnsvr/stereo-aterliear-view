@@ -23,7 +23,7 @@ The upstream command names are preserved to credit their origin and keep familia
 | Timestamps and copy-button settings | `/stereo-view settings` |
 | Help | `/stereo-view help` |
 
-Search supports literal phrases, `AND`, `OR`, `NOT`, parentheses, and a `regex:` prefix. Regex needs local ripgrep. Search is branch-local; it does not search other sessions or files. Unknown custom output stays in Conversation unless its metadata links it to a known tool call.
+Search supports literal phrases, `AND`, `OR`, `NOT`, parentheses, and a `regex:` prefix. Regex needs local ripgrep (`rg`) with PCRE2 support on your `PATH`. Search is branch-local; it does not search other sessions or files. Unknown custom output stays in Conversation unless its metadata links it to a known tool call.
 
 Turning split off combines history; it does not remove the dashboard. Zoom applies to the history area, not the dashboard or input.
 

@@ -15,7 +15,7 @@ Stereo Aterliear View is an independent combined fork of two MIT-licensed Pi ext
 
 The history projection, split layout, native render-cache integration, panel search, selection and copy controls, preferences, and timestamp handling originate here.
 
-Fork changes: use the cooperative main-pane layout API and a fork-specific settings filename. Additional combined-package tests live in `tests/`.
+Fork changes: use the cooperative main-pane layout API and a fork-specific settings filename. Regex cancellation only signals a child with a valid PID, including when ripgrep is missing. A regression test covers that failure path. Additional combined-package tests live in `tests/`.
 
 ## Pi Atelier
 

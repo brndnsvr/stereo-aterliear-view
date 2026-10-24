@@ -28,6 +28,8 @@ pi install git:github.com/brndnsvr/stereo-aterliear-view@v0.1.1
 
 **Disable or remove standalone `pi-atelier` and `pi-stereo-view` before enabling this package.** Running their renderers alongside the combined fork is unsupported. Other extensions that replace the editor or footer may also compete for those slots.
 
+Explicit `regex:` search also needs ripgrep (`rg`) with PCRE2 support on your `PATH`. Literal and Boolean-literal search do not need it.
+
 Start a new Pi session. Choose fullscreen in `/settings`, or start Pi with `--tui-mode fullscreen`. Regular mode retains combined history and Atelier's regular-mode dashboard behavior.
 
 ## Controls

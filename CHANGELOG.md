@@ -4,7 +4,8 @@
 
 - Use pnpm 12's `allowBuilds` policy so clean development installs can build the pinned terminal test helper. Other dependency build scripts remain denied.
 - Disable automatic linking of dependency-provided agent skills in development installs.
-- No extension runtime changes from 0.1.0.
+- Guard regex cancellation against signaling a process that failed to spawn, with a regression test for missing ripgrep.
+- Install ripgrep in CI and document its PCRE2/PATH requirement for explicit regex search.
 
 ## 0.1.0
 

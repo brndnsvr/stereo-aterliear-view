@@ -7,9 +7,6 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    env:
-      # Bound both the transform server and test-worker heaps on hosted runners.
-      NODE_OPTIONS: --max-old-space-size=1536
     strategy:
       fail-fast: false
       matrix:
@@ -21,5 +18,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
+      - name: Install regex search dependency
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - run: pnpm install --frozen-lockfile
       - run: pnpm check

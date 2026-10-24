@@ -83,8 +83,9 @@ function ripgrep(input: string, lines: string[], pattern: string, signal: AbortS
     let bytes = 0;
     let stderr = "";
     let failure: Error | undefined;
-    const fail = (error: Error): void => { failure ??= error; child.kill("SIGKILL"); };
-    const abort = (): void => { child.kill("SIGKILL"); };
+    // A failed spawn has no PID; never signal its uninitialized process handle.
+    const abort = (): void => { if (child.pid) child.kill("SIGKILL"); };
+    const fail = (error: Error): void => { failure ??= error; abort(); };
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) abort();
     child.stdin.on("error", () => { /* close/error reports cancellation or a failed process */ });
