@@ -7,7 +7,11 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      # Bound both the transform server and test-worker heaps on hosted runners.
+      NODE_OPTIONS: --max-old-space-size=1536
     strategy:
+      fail-fast: false
       matrix:
         node: [22, 24]
     steps:
