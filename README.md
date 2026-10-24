@@ -23,7 +23,7 @@ Requires Pi **1.4.0 or newer**, Node.js **22.19.0 or newer**, and fullscreen mod
 Install the release from GitHub:
 
 ```sh
-pi install git:github.com/brndnsvr/stereo-aterliear-view@v0.1.0
+pi install git:github.com/brndnsvr/stereo-aterliear-view@v0.1.1
 ```
 
 **Disable or remove standalone `pi-atelier` and `pi-stereo-view` before enabling this package.** Running their renderers alongside the combined fork is unsupported. Other extensions that replace the editor or footer may also compete for those slots.

@@ -1,6 +1,6 @@
 {
   "name": "stereo-aterliear-view",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Conversation, activity, and a live dashboard in one Pi extension. Built on Pi Stereo View and Pi Atelier.",
   "type": "module",
   "license": "MIT",
