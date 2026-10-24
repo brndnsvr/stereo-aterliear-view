@@ -1,0 +1,193 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { stripTerminalSequences, Text, type Component, type TUI } from "@earendil-works/pi-tui";
+import { expect, test } from "vitest";
+import { PanelSearch, type SearchHit } from "../src/search.js";
+
+const theme = () => ({ fg: (_color: string, value: string) => value }) as Theme;
+const tui = { requestRender() {}, setFocus() {} } as unknown as TUI;
+
+test("errors stay within the frame and editing to a valid query clears them", () => {
+  const entry = { source: new Text("", 0, 0), label: "User", text: "worker ready" };
+  let selected: SearchHit | undefined;
+  const bar = new PanelSearch(() => [entry], tui, theme, hit => { selected = hit; }, () => {});
+  bar.input.handleInput("worker AND");
+  expect(selected).toBeUndefined();
+  expect(bar.render(45).join("\n")).toContain("expected");
+  expect(bar.render(45)).toHaveLength(3);
+  bar.input.handleInput("\x15");
+  bar.input.handleInput("worker AND ready");
+  expect(selected?.ranges).toEqual([{ start: 0, end: 6 }, { start: 7, end: 12 }]);
+  expect(bar.render(45).join("\n")).not.toContain("expected");
+});
+
+test("cancelled regex results cannot replace a newer literal query or revive a retired search", async () => {
+  const entry = { source: new Text("", 0, 0), label: "User", text: "worker ready" };
+  const calls: (SearchHit | undefined)[] = [];
+  const bar = new PanelSearch(() => [entry], tui, theme, hit => calls.push(hit), () => {});
+  bar.input.handleInput("regex:worker(?= ready)");
+  expect(bar.render(45).join("\n")).toContain("…");
+  bar.input.handleInput("\x15");
+  bar.input.handleInput("ready");
+  const count = calls.length;
+  await new Promise(resolve => setTimeout(resolve, 100));
+  expect(calls).toHaveLength(count);
+  expect(calls.at(-1)?.ranges).toEqual([{ start: 7, end: 12 }]);
+  bar.input.handleInput("\x15");
+  bar.input.handleInput("regex:worker");
+  bar.retire(() => {});
+  const retired = calls.length;
+  await new Promise(resolve => setTimeout(resolve, 100));
+  expect(calls).toHaveLength(retired);
+});
+
+test("refreshing an unchanged regex match keeps its highlight and does not jump again", async () => {
+  const entry = { source: new Text("", 0, 0), label: "User", text: "worker ready" };
+  let other = "unrelated";
+  const calls: (SearchHit | undefined)[] = [];
+  const bar = new PanelSearch(() => [entry, { source: new Text("", 0, 0), label: "Other", text: other }],
+    tui, theme, hit => calls.push(hit), () => {});
+  const settled = async (): Promise<void> => {
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline) {
+      if (bar.render(45).join("\n").includes("1/1")) return;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    throw new Error("Regex did not settle");
+  };
+  bar.input.handleInput("regex:worker(?= ready)");
+  await settled();
+  const count = calls.length;
+  other = "unrelated streamed update";
+  bar.markDirty();
+  bar.render(45);
+  await settled();
+  expect(calls, "Unchanged selected text must stay highlighted without another jump").toHaveLength(count);
+  expect(calls.at(-1)?.text).toBe("worker ready");
+});
+test("uses only literal case-insensitive phrases across the panel", () => {
+  const entries = ["r-e-a-d-y", "already READY", "ready now", "red sky"].map(text => ({
+    source: new Text("", 0, 0), label: text, text,
+  }));
+  let selected: SearchHit | undefined;
+  const bar = new PanelSearch(() => entries, tui, theme, hit => { selected = hit; }, () => {});
+  bar.input.handleInput("ReAdY");
+  expect(bar.render(45).join("\n")).toContain("1/2");
+  expect(selected?.text).toBe("ready now");
+  bar.input.handleInput("\r");
+  expect(selected?.text).toBe("already READY");
+  bar.input.handleInput("\r");
+  expect(selected?.text, "Fuzzy-only lines must not join exact results").toBe("ready now");
+  bar.input.handleInput("\x15");
+  bar.input.handleInput("rdy nw");
+  expect(selected).toBeUndefined();
+  expect(bar.render(45).join("\n")).toContain("0/0");
+  bar.input.handleInput("\x15");
+  bar.input.handleInput("ready now");
+  expect(bar.render(45).join("\n")).toContain("1/1");
+});
+
+test("frames the live field and buttons without wrapping or losing usable input width", () => {
+  const bar = new PanelSearch(() => [], tui, theme, () => {}, () => {});
+  const rows = bar.render(24);
+  expect(rows).toHaveLength(3);
+  expect(rows[0]).toBe("┌" + "─".repeat(22) + "┐");
+  expect(stripTerminalSequences(rows[1])).toMatch(/^│.*Search:.*\[↓\].*\[×\].*│$/);
+  expect(rows[2]).toBe("└" + "─".repeat(22) + "┘");
+});
+
+test("indexes an open nonempty search once, not on ordinary frames or query edits", () => {
+  let reads = 0;
+  const entry = { source: new Text("", 0, 0), label: "User", text: "deployment runtime ready" };
+  const calls: (SearchHit | undefined)[] = [];
+  const bar = new PanelSearch(() => { reads++; return [entry]; }, tui, theme, hit => calls.push(hit), () => {});
+  bar.render(45);
+  bar.markDirty();
+  bar.render(45);
+  expect(reads, "Opening an empty field must not scan the transcript").toBe(0);
+  bar.input.handleInput("d");
+  bar.render(45);
+  bar.input.handleInput("e");
+  for (let i = 0; i < 10; i++) bar.render(45);
+  expect(reads).toBe(1);
+  expect(calls.at(-1)?.text).toBe("deployment runtime ready");
+  bar.markDirty();
+  expect(reads, "Native updates should defer indexing until the next open-search render").toBe(1);
+  bar.render(45);
+  expect(reads).toBe(2);
+  const jumps = calls.length;
+  bar.markDirty();
+  bar.render(45);
+  expect(calls, "Unrelated streamed text must not pull the reader back to the same match").toHaveLength(jumps);
+});
+
+test("a retired search input repairs later overlay focus restoration without a mounted layout", async () => {
+  const editor = new Text("editor", 0, 0);
+  const overlay = new Text("overlay", 0, 0);
+  let focused: Component | null = editor;
+  const host = {
+    requestRender() {},
+    setFocus(component: Component | null) {
+      if (focused && "focused" in focused) Reflect.set(focused, "focused", false);
+      focused = component;
+      if (focused && "focused" in focused) Reflect.set(focused, "focused", true);
+    },
+  } as unknown as TUI;
+  const bar = new PanelSearch(() => [], host, theme, () => {}, () => {});
+  bar.focus();
+  host.setFocus(overlay);
+  bar.retire(() => { if (focused === bar.input) host.setFocus(editor); });
+  await Promise.resolve();
+  expect(focused, "Retiring the field must not steal focus from the live overlay").toBe(overlay);
+  // Native overlay dismissal can restore preFocus after this layout was disposed.
+  host.setFocus(bar.input);
+  await Promise.resolve();
+  expect(focused).toBe(editor);
+});
+test("refreshes a retained occurrence when text before it changes in the same native block", () => {
+  const source = new Text("", 0, 0);
+  let content = "worker gone\nready";
+  const selected: SearchHit[] = [];
+  const bar = new PanelSearch(() => [{ source, label: "User", text: content }], tui, theme,
+    hit => { if (hit) selected.push(hit); }, () => {});
+  bar.input.handleInput("ready");
+  expect(selected.at(-1)?.line).toBe(1);
+  content = "worker ready\nready";
+  bar.markDirty();
+  bar.render(45);
+  expect(selected.at(-1)?.line).toBe(1);
+  expect(selected.at(-1)?.entry.text, "Occurrence mapping must use the updated complete saved text").toBe(content);
+});
+test("counts and visits every match beyond the old popup limit without wrapping a narrow search row", () => {
+  const entries = Array.from({ length: 250 }, (_, index) => ({
+    source: new Text("", 0, 0), label: String(index), text: "same phrase",
+  }));
+  let selected: SearchHit | undefined;
+  const bar = new PanelSearch(() => entries, tui, theme, hit => { selected = hit; }, () => {});
+  bar.input.handleInput("same");
+  expect(bar.render(45).join("\n")).toContain("1/250");
+  for (let index = 0; index < 249; index++) bar.input.handleInput("\r");
+  expect(selected?.entry.label).toBe("0");
+  expect(bar.render(45).join("\n")).toContain("250/250");
+  expect(bar.render(24)).toHaveLength(3);
+  expect(bar.render(24).join("\n")).toContain("[↓]");
+  expect(bar.render(24).join("\n")).toContain("[×]");
+  bar.input.handleInput("\r");
+  expect(selected?.entry.label).toBe("249");
+});
+test("moves through repeated matches without closing and drops the highlight on an empty query", () => {
+  const entries = ["older", "newer"].map(label => ({ source: new Text("", 0, 0), label, text: "same phrase" }));
+  const calls: (SearchHit | undefined)[] = [];
+  let closed = 0;
+  const bar = new PanelSearch(() => entries, tui, theme, hit => calls.push(hit), () => { closed++; });
+  bar.input.handleInput("same phrase");
+  expect(calls.at(-1)?.entry.label).toBe("newer");
+  bar.input.handleInput("\r");
+  expect(calls.at(-1)?.entry.label).toBe("older");
+  bar.input.handleInput("\r");
+  expect(calls.at(-1)?.entry.label).toBe("newer");
+  expect(closed).toBe(0);
+  bar.input.handleInput("\x15");
+  expect(calls.at(-1)).toBeUndefined();
+  bar.input.handleInput("\x1b");
+  expect(closed).toBe(1);
+});

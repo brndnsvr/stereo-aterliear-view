@@ -1,0 +1,54 @@
+{
+  "name": "stereo-aterliear-view",
+  "version": "0.1.0",
+  "description": "Conversation, activity, and a live dashboard in one Pi extension. Built on Pi Stereo View and Pi Atelier.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brndnsvr/stereo-aterliear-view.git"
+  },
+  "homepage": "https://github.com/brndnsvr/stereo-aterliear-view#readme",
+  "bugs": { "url": "https://github.com/brndnsvr/stereo-aterliear-view/issues" },
+  "keywords": ["pi-package", "pi", "tui", "split-pane", "dashboard", "stereo-view", "atelier"],
+  "engines": { "node": ">=22.19.0" },
+  "files": [
+    "src/",
+    "packages/atelier/src/",
+    "packages/atelier/extensions/",
+    "packages/stereo/src/",
+    "licenses/",
+    "docs/architecture.md",
+    "docs/privacy.md",
+    "docs/controls.md",
+    "THIRD_PARTY_NOTICES.md",
+    "CHANGELOG.md"
+  ],
+  "pi": { "extensions": ["./src/index.ts"] },
+  "scripts": {
+    "test": "vitest run",
+    "test:upstream": "vitest run --config vitest.upstream.config.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/atelier/tsconfig.json",
+    "lint": "biome check src tests scripts vitest.config.ts vitest.upstream.config.ts && cd packages/atelier && biome check src/split-pane.ts extensions/index.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:upstream && pnpm check:package",
+    "check:package": "node scripts/audit-package.mjs"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=1.4.0",
+    "@earendil-works/pi-tui": ">=1.4.0"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": true },
+    "@earendil-works/pi-tui": { "optional": true }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.4",
+    "@earendil-works/pi-coding-agent": "1.4.0",
+    "@earendil-works/pi-tui": "1.4.0",
+    "@types/node": "^24.0.4",
+    "pi-coding-agent-test": "0.1.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "packageManager": "pnpm@12.15.0"
+}
